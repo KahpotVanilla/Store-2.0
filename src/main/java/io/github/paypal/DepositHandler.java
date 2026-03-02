@@ -57,24 +57,23 @@ public class DepositHandler extends PaypalClient {
             orderRequest.purchaseUnits(unitRequests);
             request.requestBody(orderRequest);
 
-            HttpResponse<Order> repsonse = null;
+            HttpResponse<Order> response;
 
             try {
-                repsonse = client.execute(request);
+                response = client.execute(request);
             } catch (IOException e) {
-                e.printStackTrace();
+                store.getLogger().severe("Failed creating PayPal order: " + e.getMessage());
+                return;
             }
-
-            HttpResponse<Order> finalRepsonse = repsonse;
 
             Logger logger = store.getLogger();
             logger.info("");
             logger.info("New deposit!");
-            logger.info("UUID: " + player.getUniqueId().toString());
+            logger.info("UUID: " + player.getUniqueId());
             logger.info("Item: " + item);
             logger.info("Cost: $" + df.format(cost));
             logger.info("Total: $" + df.format(total));
-            logger.info("ID: " + finalRepsonse.result().id());
+            logger.info("ID: " + response.result().id());
             logger.info("");
 
             JSONObject pendingTransaction = new JSONObject();
@@ -84,27 +83,41 @@ public class DepositHandler extends PaypalClient {
             pendingTransaction.put("expiry", System.currentTimeMillis() + store.getConfig().getLong("EXPIRE_AFTER"));
 
             PendingTransactions pendingTransactions = store.getPendingTransactions();
-            pendingTransactions.addPendingTransaction(finalRepsonse.result().id(), pendingTransaction);
+            pendingTransactions.addPendingTransaction(response.result().id(), pendingTransaction);
 
-            ClickableMessage link_button = new ClickableMessage(ChatColor.translateAlternateColorCodes('&', store.getConfig().getString("LINK_BUTTON")))
-                    .hover(ChatColor.translateAlternateColorCodes('&', store.getConfig().getString("LINK_BUTTON_HOVER")))
-                    .link(finalRepsonse.result().links().get(1).href());
+            String paymentUrl = response.result().links().stream()
+                    .filter(linkDescription -> "approve".equalsIgnoreCase(linkDescription.rel()))
+                    .findFirst()
+                    .map(linkDescription -> linkDescription.href())
+                    .orElse(null);
 
-            link_button.add(ChatColor.translateAlternateColorCodes('&', store.getConfig().getString("CANCEL_BUTTON")))
-                    .hover(ChatColor.translateAlternateColorCodes('&', store.getConfig().getString("CANCEL_BUTTON_HOVER")))
-                    .command(store.getConfig().getString("CANCEL_BUTTON_COMMAND"));
+            if (paymentUrl == null) {
+                store.getLogger().severe("PayPal response did not contain an approval URL.");
+                return;
+            }
 
-            link_button.add(ChatColor.translateAlternateColorCodes('&', store.getConfig().getString("TIMER_BUTTON")))
-                    .hover(ChatColor.translateAlternateColorCodes('&', store.getConfig().getString("TIMER_BUTTON_HOVER")))
-                    .command(store.getConfig().getString("TIMER_BUTTON_COMMAND"));
+            String finalPaymentUrl = paymentUrl;
+            store.getServer().getScheduler().runTask(store, () -> {
+                ClickableMessage linkButton = new ClickableMessage(ChatColor.translateAlternateColorCodes('&', store.getConfig().getString("LINK_BUTTON")))
+                        .hover(ChatColor.translateAlternateColorCodes('&', store.getConfig().getString("LINK_BUTTON_HOVER")))
+                        .link(finalPaymentUrl);
 
-            player.sendMessage(ChatColor.translateAlternateColorCodes('&',
-                    store.getConfig().getString("PAYMENT_MESSAGE")
-                            .replace("{link}", finalRepsonse.result().links().get(1).href())
-                            .replace("{cost-before-fees}", df.format(cost))
-                            .replace("{cost-after-fees}", df.format(total))));
+                linkButton.add(ChatColor.translateAlternateColorCodes('&', store.getConfig().getString("CANCEL_BUTTON")))
+                        .hover(ChatColor.translateAlternateColorCodes('&', store.getConfig().getString("CANCEL_BUTTON_HOVER")))
+                        .command(store.getConfig().getString("CANCEL_BUTTON_COMMAND"));
 
-            link_button.sendToPlayer(player);
+                linkButton.add(ChatColor.translateAlternateColorCodes('&', store.getConfig().getString("TIMER_BUTTON")))
+                        .hover(ChatColor.translateAlternateColorCodes('&', store.getConfig().getString("TIMER_BUTTON_HOVER")))
+                        .command(store.getConfig().getString("TIMER_BUTTON_COMMAND"));
+
+                player.sendMessage(ChatColor.translateAlternateColorCodes('&',
+                        store.getConfig().getString("PAYMENT_MESSAGE")
+                                .replace("{link}", finalPaymentUrl)
+                                .replace("{cost-before-fees}", df.format(cost))
+                                .replace("{cost-after-fees}", df.format(total))));
+
+                linkButton.sendToPlayer(player);
+            });
         });
     }
 }

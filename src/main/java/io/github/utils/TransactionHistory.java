@@ -10,8 +10,8 @@ import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.FileWriter;
 import java.io.IOException;
-import java.util.HashMap;
 import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.Scanner;
 
 @SuppressWarnings("unchecked")
@@ -22,7 +22,7 @@ public class TransactionHistory {
 
     public TransactionHistory(Store store) {
         folder = store.getDataFolder();
-        transactions = new HashMap<>();
+        transactions = new ConcurrentHashMap<>();
     }
 
     public void exportConfig() {
@@ -71,7 +71,7 @@ public class TransactionHistory {
                 Object config = parser.parse(fileReader.nextLine());
                 JSONObject jConfig = (JSONObject)config;
 
-                transactions = ((HashMap)jConfig.get("transactions"));
+                transactions = new ConcurrentHashMap<>((Map<String, JSONObject>) jConfig.get("transactions"));
 
 
             } catch (ParseException e) {

@@ -19,7 +19,7 @@ Features:
 Store Plugin uses Maven to handle dependencies & building.
 
 #### Requirements
-* Java 8 JDK or newer
+* Java 17 JDK or newer
 * Git
 
 #### Compiling from source
@@ -48,3 +48,9 @@ Please make sure to have bug fixes/improvements in seperate pull requests from n
 
 ## License
 Store Plugin is licensed under the permissive MIT license. Please see [`LICENSE`](https://github.com/TheoBong/Store/blob/master/LICENSE) for more info.
+
+
+## Platform support
+- Paper 1.21.1 supported (GUI + PayPal checkout flow).
+- Velocity supported via the same shaded JAR (hybrid artifact contains Bukkit and Velocity entrypoints).
+- On Velocity, this plugin initializes and reports status while in-game GUI/payment interactions remain handled by backend Paper servers.

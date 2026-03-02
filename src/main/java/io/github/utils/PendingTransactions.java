@@ -10,8 +10,8 @@ import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.FileWriter;
 import java.io.IOException;
-import java.util.HashMap;
 import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.Scanner;
 
 @SuppressWarnings("unchecked")
@@ -22,7 +22,7 @@ public class PendingTransactions {
 
     public PendingTransactions(Store store) {
         folder = store.getDataFolder();
-        transactions = new HashMap<>();
+        transactions = new ConcurrentHashMap<>();
     }
 
     public void exportConfig() {
@@ -71,7 +71,7 @@ public class PendingTransactions {
                 Object config = parser.parse(fileReader.nextLine());
                 JSONObject jConfig = (JSONObject)config;
 
-                transactions = ((HashMap)jConfig.get("transactions"));
+                transactions = new ConcurrentHashMap<>((Map<String, JSONObject>) jConfig.get("transactions"));
 
 
             } catch (ParseException e) {
@@ -130,18 +130,7 @@ public class PendingTransactions {
     }
 
     public void removePendingPlayer(String playerUUID) {
-        for (JSONObject jsonObject : transactions.values()) {
-            String storedUUID = (String) jsonObject.get("playerUUID");
-            if (storedUUID.equals(playerUUID)) {
-                for (String key : transactions.keySet()) {
-                    JSONObject jsonObject1 = transactions.get(key);
-                    if (jsonObject1 == jsonObject) {
-                        transactions.remove(key);
-                    }
-                }
-            }
-        }
-
+        transactions.entrySet().removeIf(entry -> playerUUID.equals(entry.getValue().get("playerUUID")));
         new Thread(this::exportConfig).start();
     }
 
