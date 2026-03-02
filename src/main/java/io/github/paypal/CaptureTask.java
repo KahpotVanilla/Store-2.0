@@ -4,6 +4,7 @@ import io.github.Store;
 import io.github.utils.PendingTransactions;
 import org.json.simple.JSONObject;
 
+import java.util.HashMap;
 import java.util.Map;
 
 public class CaptureTask implements Runnable {
@@ -16,10 +17,9 @@ public class CaptureTask implements Runnable {
     @Override
     public void run() {
         PendingTransactions pending = store.getPendingTransactions();
-        Map<String, JSONObject> transactions;
-        transactions = pending.pendingTransactionList();
+        Map<String, JSONObject> transactions = new HashMap<>(pending.pendingTransactionList());
 
-        for (Map.Entry<String,JSONObject> entry : transactions.entrySet()) {
+        for (Map.Entry<String, JSONObject> entry : transactions.entrySet()) {
             String orderId = entry.getKey();
             JSONObject pendingTransaction = entry.getValue();
 

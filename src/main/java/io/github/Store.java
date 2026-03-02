@@ -19,18 +19,24 @@ import xyz.derkades.derkutils.bukkit.ItemBuilder;
 
 import java.io.File;
 import java.lang.reflect.Field;
+import java.util.Locale;
 import java.util.logging.Level;
 
 public class Store extends JavaPlugin {
     private CommandMap commandMap;
 
-    @Getter private PendingTransactions pendingTransactions;
-    @Getter private TransactionHistory transactionHistory;
+    @Getter
+    private PendingTransactions pendingTransactions;
+    @Getter
+    private TransactionHistory transactionHistory;
 
-    @Getter private YamlConfiguration config;
+    @Getter
+    private YamlConfiguration config;
 
     @Override
     public void onEnable() {
+        getLogger().info("Bootstrapping Store for Paper/Bukkit runtime.");
+
         pendingTransactions = new PendingTransactions(this);
         pendingTransactions.importConfig();
 
@@ -38,10 +44,12 @@ public class Store extends JavaPlugin {
         transactionHistory.importConfig();
 
         File configFile = new File(getDataFolder(), "config.yml");
-        if (!configFile.exists()) saveResource("config.yml", false);
+        if (!configFile.exists()) {
+            saveResource("config.yml", false);
+        }
         config = YamlConfiguration.loadConfiguration(configFile);
 
-        if (config.getString("CLIENT_ID").equals("") || config.getString("SECRET").equals("")) {
+        if (config.getString("CLIENT_ID", "").isEmpty() || config.getString("SECRET", "").isEmpty()) {
             getServer().getLogger().log(Level.SEVERE, "You must fill out your CLIENT_ID and SECRET in the config.yml");
             getServer().getLogger().log(Level.SEVERE, "Get your PayPal CLIENT_ID and SECRET by creating an APP here: https://developer.paypal.com/developer/applications");
             getServer().getPluginManager().disablePlugin(this);
@@ -51,29 +59,28 @@ public class Store extends JavaPlugin {
         try {
             Field commandMapField = Bukkit.getServer().getClass().getDeclaredField("commandMap");
             commandMapField.setAccessible(true);
-
             commandMap = (CommandMap) commandMapField.get(Bukkit.getServer());
         } catch (Exception e) {
-            e.printStackTrace();
+            getLogger().log(Level.SEVERE, "Failed to access Bukkit command map", e);
+            getServer().getPluginManager().disablePlugin(this);
+            return;
         }
 
         if (getConfig().getBoolean("STORE_COMMAND.ENABLED")) {
             registerCommand(new StoreCommand(this));
         }
-
         if (getConfig().getBoolean("CANCEL_COMMAND.ENABLED")) {
             registerCommand(new CancelCommand(this));
         }
-
         if (getConfig().getBoolean("TIMER_COMMAND.ENABLED")) {
             registerCommand(new TimerCommand(this));
         }
-
         if (getConfig().getBoolean("LOOKUP_COMMAND.ENABLED")) {
             registerCommand(new LookupCommand(this));
         }
 
-        getServer().getScheduler().runTaskTimerAsynchronously(this, new CaptureTask(this), 20L * config.getInt("CHECK_EVERY"), 20L * config.getInt("CHECK_EVERY"));
+        long tickInterval = 20L * config.getInt("CHECK_EVERY");
+        getServer().getScheduler().runTaskTimerAsynchronously(this, new CaptureTask(this), tickInterval, tickInterval);
     }
 
     @Override
@@ -84,26 +91,26 @@ public class Store extends JavaPlugin {
     }
 
     public void registerCommand(BaseCommand command) {
-        commandMap.register(command.getName(), command);
+        commandMap.register(command.getName().toLowerCase(Locale.ROOT), command);
     }
 
     public ItemBuilder getItemFromMaterialString(Player player, String materialString) {
         if (materialString.startsWith("head:")) {
             String owner = materialString.split(":")[1];
-            if (owner.equals("auto")) {
-                return new ItemBuilder(player.getName());
-            } else {
-                return new ItemBuilder(owner);
-            }
-        } else {
-            try {
-                Material material = Material.valueOf(materialString.toUpperCase());
-                return new ItemBuilder(material);
-            } catch (IllegalArgumentException e) {
-                player.sendMessage("Invalid item name " + materialString.toUpperCase());
-                player.sendMessage("https://helpch.at/docs/1.8/org/bukkit/Material.html");
-                return new ItemBuilder(Material.COBBLESTONE);
-            }
+            return owner.equals("auto") ? new ItemBuilder(player.getName()) : new ItemBuilder(owner);
         }
+
+        Material material = Material.matchMaterial(materialString, true);
+        if (material == null) {
+            material = Material.matchMaterial(materialString.toUpperCase(Locale.ROOT));
+        }
+
+        if (material == null) {
+            player.sendMessage("Invalid item name " + materialString.toUpperCase(Locale.ROOT));
+            player.sendMessage("https://jd.papermc.io/paper/1.21.1/org/bukkit/Material.html");
+            return new ItemBuilder(Material.COBBLESTONE);
+        }
+
+        return new ItemBuilder(material);
     }
 }

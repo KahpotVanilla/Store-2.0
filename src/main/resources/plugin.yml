@@ -1,5 +1,6 @@
 name: Store
-version: ${store.desc}
+version: ${project.version}
 description: Store Plugin
 main: io.github.Store
 author: [Theo]
+api-version: '1.21'

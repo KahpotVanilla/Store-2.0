@@ -59,13 +59,19 @@ public class CaptureOrder {
                 }
             }
 
-            Player player = Bukkit.getPlayer(playerUUID);
+            Player player = Bukkit.getPlayer(java.util.UUID.fromString(playerUUID));
+            if (player == null) {
+                store.getLogger().warning("Player " + playerUUID + " is offline; skipping command execution for order " + orderId);
+                return;
+            }
 
             commands = ListUtils.replaceInStringList(commands,
-                    new Object[] { "{player}" },
-                    new Object[] { player.getName() });
+                    new Object[]{"{player}"},
+                    new Object[]{player.getName()});
 
-            commands.forEach(command -> store.getServer().dispatchCommand(store.getServer().getConsoleSender(), command));
+            java.util.List<String> finalCommands = commands;
+            store.getServer().getScheduler().runTask(store, () ->
+                    finalCommands.forEach(command -> store.getServer().dispatchCommand(store.getServer().getConsoleSender(), command)));
 
         } catch (IOException ioe) {
             if (ioe instanceof HttpException) {
